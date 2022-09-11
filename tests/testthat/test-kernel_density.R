@@ -3,7 +3,12 @@ set.seed(123)
 # KDE can only be calculated for projected co-ordinates, so first convert data
 # to use local state plane CRS
 data_sf <- sf::st_transform(head(memphis_robberies, 100), 2843)
+data_sf$wt <- runif(nrow(data_sf), max = 1000)
 data_df <- as.data.frame(sf::st_drop_geometry(data_sf))
+data_missing_crs <- sf::st_sf(
+  row = 1:2,
+  geometry = sf::st_sfc(sf::st_point(c(1, 1)), sf::st_point(c(2, 2)))
+)
 
 # To speed up the checking process, run the function with arguments that should
 # not produce any errors or warnings
@@ -14,24 +19,23 @@ result <- kernel_density(data = data_sf, grid = grid, bandwidth = 10000)
 
 # CHECK INPUTS -----------------------------------------------------------------
 
-# Note that only inputs evaluated in `hotspot_kde()` are tested here; those
+# Note that only inputs evaluated in `kernel_density()` are tested here; those
 # evaluated in helper functions are tested in the test files for those functions
 
 
 ## Errors ----
 
-test_that("error if `data` is not an SF object containing points", {
-  expect_error(kernel_density(data = data_df, grid = grid, bandwidth = 10000))
+test_that("error if `data` has lon/lat co-ordinates", {
   expect_error(kernel_density(
-    data = sf::st_cast(data_sf, "LINESTRING"),
+    data = sf::st_transform(data_sf, 4326),
     grid = grid,
     bandwidth = 10000
   ))
 })
 
-test_that("error if `data` has lon/lat co-ordinates", {
+test_that("error if `data` has no CRS", {
   expect_error(kernel_density(
-    data = sf::st_transform(data_sf, 4326),
+    data = data_missing_crs,
     grid = grid,
     bandwidth = 10000
   ))
@@ -56,13 +60,34 @@ test_that("error if `grid` has lon/lat co-ordinates", {
   )
 })
 
-test_that("error if `bandwidth` is not `NULL` or or a single positive number", {
+test_that("error if `bandwidth` is not `NULL` or a single positive number", {
   expect_error(
     kernel_density(data = data_sf, grid = grid, bandwidth = character())
   )
   expect_error(kernel_density(data = data_sf, grid = grid, bandwidth = 1:2))
   expect_error(kernel_density(data = data_sf, grid = grid, bandwidth = -1))
   expect_error(kernel_density(data = data_sf, grid = grid, bandwidth = 0))
+})
+
+test_that("error if `bandwidth_adjust` is not a single positive number", {
+  expect_error(
+    kernel_density(data = data_sf, grid = grid, bandwidth_adjust = character())
+  )
+  expect_error(
+    kernel_density(data = data_sf, grid = grid, bandwidth_adjust = 1:2)
+  )
+  expect_error(
+    kernel_density(data = data_sf, grid = grid, bandwidth_adjust = -1)
+  )
+  expect_error(
+    kernel_density(data = data_sf, grid = grid, bandwidth_adjust = 0)
+  )
+})
+
+test_that("error if `weights` is not the name of a column in the data", {
+  expect_error(kernel_density(data = data_sf, grid = grid, weights = "blah"))
+  expect_error(kernel_density(data = data_sf, grid = grid, weights = wts))
+  expect_error(kernel_density(data = data_sf, grid = grid, weights = date))
 })
 
 test_that("error if `quiet` is not `TRUE` or `FALSE`", {
@@ -95,6 +120,10 @@ test_that("output is an SF tibble", {
     "sf"
   )
   expect_s3_class(result, "tbl_df")
+  expect_s3_class(
+    kernel_density(data = data_sf, grid = grid, kernel = "triweight"),
+    "sf"
+  )
 })
 
 test_that("output object has the required column names", {

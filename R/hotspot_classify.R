@@ -20,11 +20,15 @@
 #'   or at the earliest time found in the data otherwise.
 #' @param cell_size \code{numeric} value specifying the size of each equally
 #'   spaced grid cell, using the same units (metres, degrees, etc.) as used in
-#'   the \code{sf} data frame given in the \code{data} argument. If this
-#'   argument is \code{NULL} (the default), the cell size will be calculated
-#'   automatically (see Details).
+#'   the \code{sf} data frame given in the \code{data} argument. Ignored if
+#'   \code{grid} is not \code{NULL}. If this argument and \code{grid} are
+#'   \code{NULL} (the default), the cell size will be calculated automatically
+#'   (see Details).
 #' @param grid_type \code{character} specifying whether the grid should be made
 #'   up of squares (\code{"rect"}, the default) or hexagons (\code{"hex"}).
+#'   Ignored if \code{grid} is not \code{NULL}.
+#' @param grid \code{\link[sf]{sf}} data frame containing points containing
+#'   polygons, which will be used as the grid for which counts are made.
 #' @param collapse If the range of dates in the data is not a multiple of
 #'   \code{period}, the final period will be shorter than the others. In that
 #'   case, should this shorter period be collapsed into the penultimate period?
@@ -35,7 +39,8 @@
 #'   parameters set automatically will be suppressed. The default is
 #'   \code{FALSE}.
 #' @return An \code{\link[sf]{sf}} tibble of regular grid cells with
-#'   corresponding hot-spot classifications for each cell.
+#'   corresponding hot-spot classifications for each cell. This can be plotted
+#'   using \code{\link{autoplot}}.
 #'
 #' Hot-spots are spatial areas that contain more points than would be expected
 #' by chance; cold-spots are areas that contain fewer points than would be
@@ -109,6 +114,7 @@ hotspot_classify <- function(
   start = NULL,
   cell_size = NULL,
   grid_type = "rect",
+  grid = NULL,
   collapse = FALSE,
   params = hotspot_classify_params(),
   quiet = FALSE
@@ -125,10 +131,7 @@ hotspot_classify <- function(
   )
 
   # Check inputs that are not checked in a helper function
-  if (!inherits(data, "sf"))
-    rlang::abort("`data` must be an SF object")
-  if (any(!sf::st_is(data, "POINT")))
-    rlang::abort("`data` must be an SF object containing points")
+  validate_inputs(data = data, grid = grid, quiet = quiet)
   if (!rlang::is_false(time) & !time %in% names(data))
     rlang::abort(
       "`time` must be `NULL` or the name of a column in the `data` object"
@@ -161,8 +164,6 @@ hotspot_classify <- function(
       "`params` must be a list containing all the required parameters",
       "i" = "use `hotspot_classify_params()` to construct the `params` argument"
     ))
-  if (!rlang::is_logical(quiet, n = 1))
-    rlang::abort("`quiet` must be `TRUE` or `FALSE`")
 
   # Find time column if not specified
   if (isFALSE(time)) {
@@ -339,12 +340,14 @@ hotspot_classify <- function(
     cell_size <- set_cell_size(data, round = TRUE, quiet = quiet)
 
   # Create grid
-  grid <- create_grid(
-    data,
-    cell_size = cell_size,
-    grid_type = grid_type,
-    quiet = quiet
-  )
+  if (rlang::is_null(grid)) {
+    grid <- create_grid(
+      data,
+      cell_size = cell_size,
+      grid_type = grid_type,
+      quiet = quiet
+    )
+  }
 
   # Categorise data by period
   if (unit == "year") {
@@ -473,28 +476,35 @@ hotspot_classify <- function(
 
   # Set number of recent periods
   recent_periods <- floor(params$recent_prop * ncol(ch))
+  recent_warn <- FALSE
   if (recent_periods < 1 | ncol(ch) - recent_periods < 1) {
     recent_periods <- 1
+    recent_warn <- TRUE
+  }
+  if (ncol(ch) - recent_periods < 1) {
+    rlang::abort(c(
+      "Zero periods identified as being non-recent",
+      "i" = "There must be at least one recent and one non-recent period",
+      "i" = paste(
+        "Specify a shorter period to generate at least one non-recent period,",
+        "or specify a smaller proportion of periods to be treated as recent",
+        "using `hotspot_classify_params()`"
+      )
+    ))
+  }
+  if (rlang::is_true(recent_warn)) {
+    # Warn here, rather than above, so that if both recent periods and
+    # non-recent periods are zero then the above error will happen before this
+    # warning
     rlang::warn(c(
       "Zero periods identified as being recent",
-      "i" = "the final period will be treated as being recent",
+      "i" = "The final period will be treated as being recent",
       "i" = paste(
-        "specify a larger proportion of periods to be treated as recent using",
+        "Specify a larger proportion of periods to be treated as recent using",
         "`hotspot_classify_params()`"
       )
     ))
   }
-  if (ncol(ch) - recent_periods < 1) rlang::abort(c(
-    "Zero periods identified as being non-recent",
-    "i" = "there must be at least one recent and one non-recent period",
-    "i" = paste(
-      "specify a shorter period to generate at least one non-recent period, or"
-    ),
-    "i" = paste(
-      "specify a smaller proportion of periods to be treated as recent using",
-      "`hotspot_classify_params()`"
-    )
-  ))
 
   # Count number of significant values
   cs <- tibble::tibble(
@@ -573,6 +583,7 @@ hotspot_classify <- function(
   )
 
   # Return result
-  grid[, c("hotspot_category", "geometry")]
+  result <- grid[, c("hotspot_category", "geometry")]
+  structure(result, class = c("hspt_c", class(result)))
 
 }

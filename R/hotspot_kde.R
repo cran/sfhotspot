@@ -1,33 +1,41 @@
-#' Estimate two-dimensional kernel density of points on a regular grid
+#' Estimate two-dimensional kernel density of points
 #'
 #' @param data \code{\link[sf]{sf}} data frame containing points.
 #' @param cell_size \code{numeric} value specifying the size of each equally
 #'   spaced grid cell, using the same units (metres, degrees, etc.) as used in
-#'   the \code{sf} data frame given in the \code{data} argument. If this
-#'   argument is \code{NULL} (the default), the cell size will be calculated
-#'   automatically (see Details).
+#'   the \code{sf} data frame given in the \code{data} argument. Ignored if
+#'   \code{grid} is not \code{NULL}. If this argument and \code{grid} are
+#'   \code{NULL} (the default), the cell size will be calculated automatically
+#'   (see Details).
 #' @param grid_type \code{character} specifying whether the grid should be made
 #'   up of squares (\code{"rect"}, the default) or hexagons (\code{"hex"}).
+#'   Ignored if \code{grid} is not \code{NULL}.
 #' @param bandwidth \code{numeric} value specifying the bandwidth to be used in
 #'   calculating the kernel density estimates. If this argument is \code{NULL}
-#'   (the default), the bandwidth will be specified automatically using the mean
-#'   result of \code{\link[MASS]{bandwidth.nrd}} called on the \code{x} and
-#'   \code{y} co-ordinates separately.
+#'   (the default), the bandwidth will be determined automatically using the
+#'   result of \code{\link[MASS]{bandwidth.nrd}} called on the co-ordinates of
+#'   \code{data}.
+#' @param bandwidth_adjust single positive \code{numeric} value by which the
+#'   value of \code{bandwidth} is multiplied. Useful for setting the bandwidth
+#'   relative to the default.
+#' @param grid \code{\link[sf]{sf}} data frame containing polygons, which will
+#'   be used as the grid for which densities are estimated.
+#' @param weights \code{NULL} or the name of a column in \code{data} to be used
+#'   as weights for weighted counts and KDE values.
 #' @param quiet if set to \code{TRUE}, messages reporting the values of any
 #'   parameters set automatically will be suppressed. The default is
 #'   \code{FALSE}.
 #' @param ... Further arguments passed to \code{\link[SpatialKDE]{kde}}.
-#' @return An \code{\link[sf]{sf}} tibble of regular grid cells with
-#'   corresponding point counts and kernel density estimates for each cell.
-#'
-#'   The output from this function can be plotted in the same way as for other
-#'   SF objects, for which see \code{vignette("sf5", package = "sf")}.
+#' @return An \code{\link[sf]{sf}} tibble of grid cells with corresponding point
+#'   counts and kernel density estimates for each cell. This can be plotted
+#'   using \code{\link{autoplot}}.
 #'
 #' @details
 #'
-#' This function uses functions from the \code{SpatialKDE} package to create a
-#' regular two-dimensional grid of cells and then calculate the density of
-#' points in each cell. The count of points in each cell is also returned.
+#' This function creates a regular two-dimensional grid of cells (unless a
+#' custom grid is specified with \code{grid}) and calculates the density of
+#' points in each cell on that grid using functions from the \code{SpatialKDE}
+#' package. The count of points in each cell is also returned.
 #'
 #' ## Coverage of the output data
 #'
@@ -78,34 +86,70 @@ hotspot_kde <- function(
   cell_size = NULL,
   grid_type = "rect",
   bandwidth = NULL,
+  bandwidth_adjust = 1,
+  grid = NULL,
+  weights = NULL,
   quiet = FALSE,
   ...
 ) {
 
-  # Check inputs that are not checked in a helper function
-  if (!inherits(data, "sf"))
-    rlang::abort("`data` must be an SF object")
-  if (any(!sf::st_is(data, "POINT")))
-    rlang::abort("`data` must be an SF object containing points")
-  if (!rlang::is_logical(quiet))
-    rlang::abort("`quiet` must be one of `TRUE` or `FALSE`")
-
-  # Create grid
-  grid <- create_grid(
-    data,
-    cell_size = cell_size,
-    grid_type = grid_type,
-    quiet = quiet
+  # Process arguments that are column names
+  weights <- ifelse(
+    rlang::quo_is_null(rlang::enquo(weights)),
+    NA_character_,
+    rlang::as_name(rlang::enquo(weights))
   )
 
-  # Count points
-  counts <- count_points_in_polygons(data, grid)
+  # Check inputs that are not checked in a helper function
+  validate_inputs(data = data, grid = grid, quiet = quiet)
 
-  # Calculate KDE
-  kde_val <- kernel_density(data, grid, bandwidth = bandwidth, quiet = quiet)
+  # Create grid
+  if (rlang::is_null(grid)) {
+    grid <- create_grid(
+      data,
+      cell_size = cell_size,
+      grid_type = grid_type,
+      quiet = quiet
+    )
+  }
+
+  # Count points and calculate KDE
+  if (rlang::is_chr_na(weights)) {
+    counts <- count_points_in_polygons(data, grid)
+    kde_val <- kernel_density(
+      data,
+      grid,
+      bandwidth = bandwidth,
+      bandwidth_adjust = bandwidth_adjust,
+      quiet = quiet,
+      ...
+    )
+  } else {
+    counts <- count_points_in_polygons(data, grid, weights = weights)
+    kde_val <- kernel_density(
+      data,
+      grid,
+      bandwidth = bandwidth,
+      bandwidth_adjust = bandwidth_adjust,
+      weights = weights,
+      quiet = quiet,
+      ...
+    )
+  }
+
+  # Add KDE
   counts$kde <- kde_val$kde_value
 
   # Return result
-  sf::st_as_sf(tibble::as_tibble(counts[, c("n", "kde", "geometry")]))
+  if ("sum" %in% names(counts)) {
+    result <- sf::st_as_sf(
+      tibble::as_tibble(counts[, c("n", "sum", "kde", "geometry")])
+    )
+  } else {
+    result <- sf::st_as_sf(
+      tibble::as_tibble(counts[, c("n", "kde", "geometry")])
+    )
+  }
+  structure(result, class = c("hspt_k", class(result)))
 
 }

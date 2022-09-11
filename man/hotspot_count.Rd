@@ -4,19 +4,34 @@
 \alias{hotspot_count}
 \title{Count points in cells in a two-dimensional grid}
 \usage{
-hotspot_count(data, cell_size = NULL, grid_type = "rect", quiet = FALSE)
+hotspot_count(
+  data,
+  cell_size = NULL,
+  grid_type = "rect",
+  grid = NULL,
+  weights = NULL,
+  quiet = FALSE
+)
 }
 \arguments{
 \item{data}{\code{\link[sf]{sf}} data frame containing points.}
 
 \item{cell_size}{\code{numeric} value specifying the size of each equally
 spaced grid cell, using the same units (metres, degrees, etc.) as used in
-the \code{sf} data frame given in the \code{data} argument. If this
-argument is \code{NULL} (the default), the cell size will be calculated
-automatically (see Details).}
+the \code{sf} data frame given in the \code{data} argument. Ignored if
+\code{grid} is not \code{NULL}. If this argument and \code{grid} are
+\code{NULL} (the default), the cell size will be calculated automatically
+(see Details).}
 
 \item{grid_type}{\code{character} specifying whether the grid should be made
-up of squares (\code{"rect"}, the default) or hexagons (\code{"hex"}).}
+up of squares (\code{"rect"}, the default) or hexagons (\code{"hex"}).
+Ignored if \code{grid} is not \code{NULL}.}
+
+\item{grid}{\code{\link[sf]{sf}} data frame containing polygons, which will
+be used as the grid for which counts are made.}
+
+\item{weights}{\code{NULL} or the name of a column in \code{data} to be used
+as weights for weighted counts.}
 
 \item{quiet}{if set to \code{TRUE}, messages reporting the values of any
 parameters set automatically will be suppressed. The default is
@@ -24,22 +39,22 @@ parameters set automatically will be suppressed. The default is
 }
 \value{
 An \code{\link[sf]{sf}} tibble of regular grid cells with
-corresponding point counts for each cell.
-
-The output from this function can be plotted in the same way as for other
-SF objects, for which see \code{vignette("sf5", package = "sf")}.
+corresponding point counts for each cell. This can be plotted using
+\code{\link{autoplot}}.
 }
 \description{
 Count points in cells in a two-dimensional grid
 }
 \details{
-This function counts the number of points in each cell in a regular grid.
+This function counts the number of points in each cell in a regular grid. If
+a column name in \code{data} is supplied with the \code{weights} argument,
+weighted counts will also be produced.
 \subsection{Automatic cell-size selection}{
 
-If no cell size is given then the cell size will be set so that there are 50
-cells on the shorter side of the grid. If the \code{data} SF object is projected
-in metres or feet, the number of cells will be adjusted upwards so that the
-cell size is a multiple of 100.
+If \code{grid} is \code{NULL} and no cell size is given, the cell size will be set so
+that there are 50 cells on the shorter side of the grid. If the \code{data} SF
+object is projected in metres or feet, the number of cells will be adjusted
+upwards so that the cell size is a multiple of 100.
 }
 }
 \examples{

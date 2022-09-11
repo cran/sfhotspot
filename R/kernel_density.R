@@ -8,23 +8,40 @@
 #'   (the default), the bandwidth will be specified automatically using the mean
 #'   result of \code{\link[MASS]{bandwidth.nrd}} called on the \code{x} and
 #'   \code{y} co-ordinates separately.
+#' @param bandwidth_adjust single positive \code{numeric} value by which the
+#'   value of \code{bandwidth} is multiplied. Useful for setting the bandwidth
+#'   relative to the default.
+#' @param weights character vector giving the name of a numeric column in
+#'   \code{data} representing weights for weighted KDE values.
 #' @param quiet if set to \code{TRUE}, messages reporting the values of any
 #'   parameters set automatically will be suppressed. The default is
 #'   \code{TRUE}.
+#' @param ... Further arguments passed to \code{\link[SpatialKDE]{kde}}.
 #' @return An SF object based on \code{grid} with a column indicating the
 #'   density estimate for each cell.
 #' @noRd
 
-kernel_density <- function(data, grid, bandwidth = NULL, quiet = TRUE) {
+kernel_density <- function(
+  data,
+  grid,
+  bandwidth = NULL,
+  bandwidth_adjust = 1,
+  weights = NULL,
+  quiet = TRUE,
+  ...
+) {
 
   # Check inputs
-  if (!inherits(data, "sf"))
-    rlang::abort("`data` must be an SF object")
-  if (any(!sf::st_is(data, "POINT")))
-    rlang::abort("`data` must be an SF object containing points")
-  if (sf::st_is_longlat(data)) {
+  if (
+    sf::st_is_longlat(data) |
+    rlang::is_empty(sf::st_crs(data, parameters = TRUE))
+  ) {
     rlang::abort(c(
-      "KDE values cannot be calculated for lon/lat data",
+      paste(
+        "KDE values cannot be calculated for lon/lat data or data without a",
+        "co-ordinate reference system"
+      ),
+      "i" = "Check projection of `data` using st_crs()",
       "i" = "Transform `data` to use a projected CRS"
     ))
   }
@@ -38,12 +55,17 @@ kernel_density <- function(data, grid, bandwidth = NULL, quiet = TRUE) {
       "i" = "Transform `grid` to use a projected CRS"
     ))
   }
-  if (!rlang::is_null(bandwidth) & !rlang::is_double(bandwidth, n = 1))
-    rlang::abort("`bandwidth` must be NULL or a single numeric value")
-  if (!rlang::is_null(bandwidth)) {
-    if (bandwidth <= 0) rlang::abort("`bandwidth` must be greater than zero")
+  validate_bandwidth(bandwidth = bandwidth, adjust = bandwidth_adjust)
+  if (!rlang::is_null(weights)) {
+    if (!weights %in% names(data) | !rlang::is_character(weights, n = 1))
+      rlang::abort("`weights` must be `NULL` or the name of a single column.")
+    if (!rlang::is_bare_numeric(data[[weights]])) {
+      rlang::abort(
+        "`weights` must be `NULL` or the name of a column of numeric values."
+      )
+    }
   }
-  if (!rlang::is_logical(quiet))
+  if (!rlang::is_logical(quiet, n = 1))
     rlang::abort("`quiet` must be one of `TRUE` or `FALSE`")
 
   # Set bandwidth if not specified
@@ -53,12 +75,44 @@ kernel_density <- function(data, grid, bandwidth = NULL, quiet = TRUE) {
   # Code for suppressing specific messages is from
   # https://stackoverflow.com/a/38605924/8222654
   if (rlang::is_true(quiet)) {
-    kde_val <- suppressMessages(
-      SpatialKDE::kde(data, band_width = bandwidth, grid = grid)
-    )
+    if (rlang::is_null(weights)) {
+      kde_val <- suppressMessages(
+        SpatialKDE::kde(
+          data,
+          band_width = bandwidth * bandwidth_adjust,
+          grid = grid,
+          ...
+        )
+      )
+    } else {
+      kde_val <- suppressMessages(
+        SpatialKDE::kde(
+          data,
+          band_width = bandwidth * bandwidth_adjust,
+          weights = data[[weights]],
+          grid = grid,
+          ...
+        )
+      )
+    }
   } else {
     withCallingHandlers({
-      kde_val <- SpatialKDE::kde(data, band_width = bandwidth, grid = grid)
+      if (rlang::is_null(weights)) {
+        kde_val <- SpatialKDE::kde(
+          data,
+          band_width = bandwidth * bandwidth_adjust,
+          grid = grid,
+          ...
+        )
+      } else {
+        kde_val <- SpatialKDE::kde(
+          data,
+          band_width = bandwidth * bandwidth_adjust,
+          weights = data[[weights]],
+          grid = grid,
+          ...
+        )
+      }
     }, message = function(m) {
       if (startsWith(conditionMessage(m), "Using centroids instead"))
         invokeRestart("muffleMessage")

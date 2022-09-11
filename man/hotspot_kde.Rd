@@ -2,13 +2,16 @@
 % Please edit documentation in R/hotspot_kde.R
 \name{hotspot_kde}
 \alias{hotspot_kde}
-\title{Estimate two-dimensional kernel density of points on a regular grid}
+\title{Estimate two-dimensional kernel density of points}
 \usage{
 hotspot_kde(
   data,
   cell_size = NULL,
   grid_type = "rect",
   bandwidth = NULL,
+  bandwidth_adjust = 1,
+  grid = NULL,
+  weights = NULL,
   quiet = FALSE,
   ...
 )
@@ -18,18 +21,30 @@ hotspot_kde(
 
 \item{cell_size}{\code{numeric} value specifying the size of each equally
 spaced grid cell, using the same units (metres, degrees, etc.) as used in
-the \code{sf} data frame given in the \code{data} argument. If this
-argument is \code{NULL} (the default), the cell size will be calculated
-automatically (see Details).}
+the \code{sf} data frame given in the \code{data} argument. Ignored if
+\code{grid} is not \code{NULL}. If this argument and \code{grid} are
+\code{NULL} (the default), the cell size will be calculated automatically
+(see Details).}
 
 \item{grid_type}{\code{character} specifying whether the grid should be made
-up of squares (\code{"rect"}, the default) or hexagons (\code{"hex"}).}
+up of squares (\code{"rect"}, the default) or hexagons (\code{"hex"}).
+Ignored if \code{grid} is not \code{NULL}.}
 
 \item{bandwidth}{\code{numeric} value specifying the bandwidth to be used in
 calculating the kernel density estimates. If this argument is \code{NULL}
-(the default), the bandwidth will be specified automatically using the mean
-result of \code{\link[MASS]{bandwidth.nrd}} called on the \code{x} and
-\code{y} co-ordinates separately.}
+(the default), the bandwidth will be determined automatically using the
+result of \code{\link[MASS]{bandwidth.nrd}} called on the co-ordinates of
+\code{data}.}
+
+\item{bandwidth_adjust}{single positive \code{numeric} value by which the
+value of \code{bandwidth} is multiplied. Useful for setting the bandwidth
+relative to the default.}
+
+\item{grid}{\code{\link[sf]{sf}} data frame containing polygons, which will
+be used as the grid for which densities are estimated.}
+
+\item{weights}{\code{NULL} or the name of a column in \code{data} to be used
+as weights for weighted counts and KDE values.}
 
 \item{quiet}{if set to \code{TRUE}, messages reporting the values of any
 parameters set automatically will be suppressed. The default is
@@ -38,19 +53,18 @@ parameters set automatically will be suppressed. The default is
 \item{...}{Further arguments passed to \code{\link[SpatialKDE]{kde}}.}
 }
 \value{
-An \code{\link[sf]{sf}} tibble of regular grid cells with
-corresponding point counts and kernel density estimates for each cell.
-
-The output from this function can be plotted in the same way as for other
-SF objects, for which see \code{vignette("sf5", package = "sf")}.
+An \code{\link[sf]{sf}} tibble of grid cells with corresponding point
+counts and kernel density estimates for each cell. This can be plotted
+using \code{\link{autoplot}}.
 }
 \description{
-Estimate two-dimensional kernel density of points on a regular grid
+Estimate two-dimensional kernel density of points
 }
 \details{
-This function uses functions from the \code{SpatialKDE} package to create a
-regular two-dimensional grid of cells and then calculate the density of
-points in each cell. The count of points in each cell is also returned.
+This function creates a regular two-dimensional grid of cells (unless a
+custom grid is specified with \code{grid}) and calculates the density of
+points in each cell on that grid using functions from the \code{SpatialKDE}
+package. The count of points in each cell is also returned.
 \subsection{Coverage of the output data}{
 
 The grid produced by this function covers the convex hull of the input data
