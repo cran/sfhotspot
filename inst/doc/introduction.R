@@ -9,7 +9,6 @@ knitr::opts_chunk$set(
 )
 
 ## ----setup, echo=FALSE, include=FALSE-----------------------------------------
-library(ggspatial)
 library(sf)
 library(sfhotspot)
 library(ggplot2)
@@ -22,7 +21,6 @@ knitr::kable(
 
 ## -----------------------------------------------------------------------------
 ggplot(memphis_robberies) + 
-  annotation_map_tile(type = "cartolight", zoomin = 0, quiet = TRUE) +
   geom_sf(alpha = 0.1) + 
   theme_minimal()
 
@@ -33,7 +31,6 @@ point_counts
 
 ## -----------------------------------------------------------------------------
 ggplot() +
-  annotation_map_tile(type = "cartolight", zoomin = 0, quiet = TRUE) +
   geom_sf(
     mapping = aes(fill = n),
     data = point_counts,
@@ -52,7 +49,6 @@ robbery_kde
 
 ## -----------------------------------------------------------------------------
 ggplot() +
-  annotation_map_tile(type = "cartolight", zoomin = 0, quiet = TRUE) +
   geom_sf(
     mapping = aes(fill = kde),
     data = robbery_kde,

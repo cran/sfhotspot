@@ -1,6 +1,6 @@
 Package: sfhotspot
 Title: Hot-Spot Analysis with Simple Features
-Version: 0.7.1
+Version: 0.8.0
 Authors@R: 
     person("Matt", "Ashby", , "matthew.ashby@ucl.ac.uk", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0003-4201-9239"))
@@ -27,8 +27,8 @@ LazyData: true
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 NeedsCompilation: no
-Packaged: 2023-02-10 19:59:26 UTC; mattashby
+Packaged: 2023-09-18 16:07:31 UTC; mattashby
 Author: Matt Ashby [aut, cre] (<https://orcid.org/0000-0003-4201-9239>)
 Maintainer: Matt Ashby <matthew.ashby@ucl.ac.uk>
 Repository: CRAN
-Date/Publication: 2023-02-10 20:40:02 UTC
+Date/Publication: 2023-09-19 10:50:02 UTC
