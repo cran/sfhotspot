@@ -1,4 +1,4 @@
-## ---- include = FALSE---------------------------------------------------------
+## ----include = FALSE----------------------------------------------------------
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
@@ -13,7 +13,7 @@ library(sf)
 library(sfhotspot)
 library(ggplot2)
 
-## ---- echo=FALSE--------------------------------------------------------------
+## ----echo=FALSE---------------------------------------------------------------
 knitr::kable(
   memphis_robberies[1:10, ], 
   caption = "The included `memphis_robberies` dataset"
@@ -39,7 +39,7 @@ ggplot() +
   ) +
   scale_fill_distiller(direction = 1)
 
-## ---- echo=FALSE, include=FALSE-----------------------------------------------
+## ----echo=FALSE, include=FALSE------------------------------------------------
 robbery_kde <- memphis_robberies |> 
   st_transform("EPSG:2843") |> 
   hotspot_kde()
