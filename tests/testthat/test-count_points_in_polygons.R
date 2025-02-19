@@ -10,6 +10,10 @@ polygons <- create_grid(data = data_sf, cell_size = 0.1)
 polygons$extra_col <- TRUE
 polygons <- sf::st_set_geometry(polygons, "random_geom_column_name")
 
+# Move one point outside the area covered by the polygons
+points_outside <- data_sf
+points_outside$geometry[[1]] <- sf::st_point(c(0, 0))
+
 result <- count_points_in_polygons(
   points = data_sf,
   polygons = polygons
@@ -41,45 +45,60 @@ test_that("error if `polygons` is not an SF object containing polygons", {
 })
 
 test_that("error if `weights` is not NULL or the name of a colum in `points`", {
-  expect_error(count_points_in_polygons(
-    points = data_sf,
-    polygons = polygons,
-    wt = character()
-  ))
-  expect_error(count_points_in_polygons(
-    points = data_sf,
-    polygons = polygons,
-    wt = "blah"
-  ))
+  expect_error(
+    count_points_in_polygons(data_sf, polygons, weights = "blah"),
+    "`weights` must be `NULL` or the name of a single column"
+  )
+  expect_error(
+    count_points_in_polygons(data_sf, polygons, weights = "NAME"),
+    "`weights` must be `NULL` or the name of a column of numeric values"
+  )
 })
 
 ## Warnings ----
+
+test_that("warning if some points outside polygons", {
+  expect_warning(
+    count_points_in_polygons(
+      points_outside,
+      polygons = polygons,
+      quiet = FALSE
+    ),
+    "outside the area covered by the supplied polygons"
+  )
+})
+
+test_that("no warning if points outside polygons but `quiet = TRUE` (#52)", {
+  expect_no_warning(
+    count_points_in_polygons(points_outside, polygons = polygons, quiet = TRUE)
+  )
+})
 
 test_that("warning if `polygons` includes column names used internally", {
   polygons_warn <- polygons
   expect_warning(
     {
       polygons_warn$n <- 1
-      count_points_in_polygons(points = data_sf, polygons = polygons_warn)
+      count_points_in_polygons(
+        points = data_sf,
+        polygons = polygons_warn,
+        quiet = FALSE
+      )
       polygons_warn$n <- NULL
     },
-    regexp = "Existing column 'n' will be overwritten."
+    regexp = "Existing column `n` will be overwritten."
   )
   expect_warning(
     {
       polygons_warn$`.polygon_id` <- 1
-      count_points_in_polygons(points = data_sf, polygons = polygons_warn)
+      count_points_in_polygons(
+        points = data_sf,
+        polygons = polygons_warn,
+        quiet = FALSE
+      )
       polygons_warn$`.polygon_id` <- NULL
     },
-    regexp = "Existing column '.polygon_id' will be removed."
-  )
-  expect_warning(
-    {
-      polygons_warn$sum <- 1
-      count_points_in_polygons(points = data_sf, polygons = polygons_warn)
-      polygons_warn$sum <- NULL
-    },
-    regexp = "Existing column 'sum' will be removed."
+    regexp = "Existing column `.polygon_id` will be removed."
   )
   expect_warning(
     {
@@ -87,19 +106,36 @@ test_that("warning if `polygons` includes column names used internally", {
       count_points_in_polygons(
         points = data_sf,
         polygons = polygons_warn,
-        weights = "wt"
+        quiet = FALSE
       )
       polygons_warn$sum <- NULL
     },
-    regexp = "Existing column 'sum' will be overwritten."
+    regexp = "Existing column `sum` will be removed."
+  )
+  expect_warning(
+    {
+      polygons_warn$sum <- 1
+      count_points_in_polygons(
+        points = data_sf,
+        polygons = polygons_warn,
+        weights = "wt",
+        quiet = FALSE
+      )
+      polygons_warn$sum <- NULL
+    },
+    regexp = "Existing column `sum` will be overwritten."
   )
   expect_warning(
     {
       polygons_warn$x <- 1
-      count_points_in_polygons(points = data_sf, polygons = polygons_warn)
+      count_points_in_polygons(
+        points = data_sf,
+        polygons = polygons_warn,
+        quiet = FALSE
+      )
       polygons_warn$x <- NULL
     },
-    regexp = "Existing column 'x' will be removed."
+    regexp = "Existing column `x` will be removed."
   )
 })
 

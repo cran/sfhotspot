@@ -9,17 +9,16 @@
 #'
 #' @noRd
 
-count_points_in_polygons <- function(points, polygons, weights = NULL) {
+count_points_in_polygons <- function(
+    points,
+    polygons,
+    weights = NULL,
+    quiet = TRUE
+  ) {
 
   # Check inputs
-  if (!inherits(points, "sf"))
-    rlang::abort("`points` must be an SF object.")
-  if (any(!sf::st_is(points, "POINT")))
-    rlang::abort("`points` must be an SF object containing points.")
-  if (!inherits(polygons, "sf"))
-    rlang::abort("`polygons` must be an SF object.")
-  if (any(!sf::st_is(polygons, "POLYGON")))
-    rlang::abort("`polygons` must be an SF object containing polygons.")
+  validate_sf(points, label = "points", type = "POINT")
+  validate_sf(polygons, label = "polygons", type = c("POLYGON", "MULTIPOLYGON"))
   if (!rlang::is_null(weights)) {
     if (!weights %in% names(points))
       rlang::abort("`weights` must be `NULL` or the name of a single column.")
@@ -31,32 +30,36 @@ count_points_in_polygons <- function(points, polygons, weights = NULL) {
   }
 
   # Warn if polygons object contains column names used internally
-  if ("n" %in% names(polygons)) {
-    rlang::warn(c(
-      "Existing column 'n' will be overwritten.",
+  if ("n" %in% names(polygons) & rlang::is_false(quiet)) {
+    cli::cli_warn(c(
+      "Existing column {.var n} will be overwritten.",
       "i" = "Consider renaming the existing column first."
     ))
   }
-  if (".polygon_id" %in% names(polygons)) {
-    rlang::warn(c(
-      "Existing column '.polygon_id' will be removed.",
+  if (".polygon_id" %in% names(polygons) & rlang::is_false(quiet)) {
+    cli::cli_warn(c(
+      "Existing column {.var .polygon_id} will be removed.",
       "i" = "Consider renaming the existing column first."
     ))
   }
-  if ("x" %in% names(polygons)) {
-    rlang::warn(c(
-      "Existing column 'x' will be removed.",
+  if ("x" %in% names(polygons) & rlang::is_false(quiet)) {
+    cli::cli_warn(c(
+      "Existing column {.var x} will be removed.",
       "i" = "Consider renaming the existing column first."
     ))
   }
-  if (!rlang::is_null(weights) & "sum" %in% names(polygons)) {
-    rlang::warn(c(
-      "Existing column 'sum' will be overwritten.",
+  if (
+    !rlang::is_null(weights) &
+    "sum" %in% names(polygons) &
+    rlang::is_false(quiet)
+  ) {
+    cli::cli_warn(c(
+      "Existing column {.var sum} will be overwritten.",
       "i" = "Consider renaming the existing column first."
     ))
-  } else if ("sum" %in% names(polygons)) {
-    rlang::warn(c(
-      "Existing column 'sum' will be removed.",
+  } else if ("sum" %in% names(polygons) & rlang::is_false(quiet)) {
+    cli::cli_warn(c(
+      "Existing column {.var sum} will be removed.",
       "i" = "Consider renaming the existing column first."
     ))
   }
@@ -99,14 +102,13 @@ count_points_in_polygons <- function(points, polygons, weights = NULL) {
 
   # Check if any points were not counted in polygons (e.g. because the polygons
   # do not cover all the points)
-  if (nrow(points) > sum(counts$n)) {
-    rlang::warn(c(
-      paste(
-        format(nrow(points) - sum(counts$n), big.mark = ","),
-        "points are outside the area covered by the supplied polygons."
-      ),
-      "i" = "These points have not been used in generating the results."
-    ))
+  if (nrow(points) > sum(counts$n) & rlang::is_false(quiet)) {
+    cli::cli_warn(
+      paste0(
+        "{format(nrow(points) - sum(counts$n), big.mark = ',')} point{?s} ",
+        "{?is/are} outside the area covered by the supplied polygons."
+      )
+    )
   }
 
   # Remove working columns and convert to SF object
